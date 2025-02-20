@@ -14,8 +14,10 @@ struct BackgroundView: View {
                 .none
             }
 
-        Spacer()
-            .background(.regularMaterial)
-            .preferredColorScheme(theme)
+        if configManager.config.rootToml.showBackground {
+            Spacer()
+                .background(.regularMaterial)
+                .preferredColorScheme(theme)
+        }
     }
 }

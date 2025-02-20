@@ -3,15 +3,18 @@ import Foundation
 struct RootToml: Decodable {
     var theme: String?
     var widgets: WidgetsSection
+    var showBackground: Bool // Pd618
 
     init() {
         self.theme = nil
         self.widgets = WidgetsSection(displayed: [], others: [:])
+        self.showBackground = true // P2519
     }
 
     private enum CodingKeys: String, CodingKey {
         case theme
         case widgets
+        case showBackground // Pd618
     }
 }
 

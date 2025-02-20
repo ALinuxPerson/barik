@@ -57,6 +57,7 @@ final class ConfigManager: ObservableObject {
     private func createDefaultConfig(at path: String) throws {
         let defaultTOML = """
             theme = "system" # system, light, dark
+            showBackground = true
 
             [widgets]
             displayed = [ # widgets on menu bar
