@@ -6,6 +6,7 @@ class SpacesViewModel: ObservableObject {
     @Published var spaces: [AnySpace] = []
     private var timer: Timer?
     private var provider: AnySpacesProvider?
+    private var cancellables: Set<AnyCancellable> = []
 
     init() {
         let runningApps = NSWorkspace.shared.runningApplications.compactMap {
@@ -26,16 +27,52 @@ class SpacesViewModel: ObservableObject {
     }
 
     private func startMonitoring() {
+        if let provider = provider {
+            if provider.isEventBased {
+                startMonitoringEventBasedProvider()
+            } else {
+                startMonitoringPollingBasedProvider()
+            }
+        }
+    }
+
+    private func stopMonitoring() {
+        if let provider = provider {
+            if provider.isEventBased {
+                stopMonitoringEventBasedProvider()
+            } else {
+                stopMonitoringPollingBasedProvider()
+            }
+        }
+    }
+    
+    private func startMonitoringPollingBasedProvider() {
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) {
             [weak self] _ in
             self?.loadSpaces()
         }
         loadSpaces()
     }
-
-    private func stopMonitoring() {
+    
+    private func stopMonitoringPollingBasedProvider() {
         timer?.invalidate()
         timer = nil
+    }
+    
+    private func startMonitoringEventBasedProvider() {
+        guard let provider = provider else { return }
+        provider.spacesPublisher?
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] spaces in
+                self?.spaces = spaces
+            }
+            .store(in: &cancellables)
+        provider.startObserving()
+    }
+    
+    private func stopMonitoringEventBasedProvider() {
+        provider?.stopObserving()
+        cancellables.removeAll()
     }
 
     private func loadSpaces() {
