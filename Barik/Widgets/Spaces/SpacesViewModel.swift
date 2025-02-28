@@ -7,6 +7,7 @@ class SpacesViewModel: ObservableObject {
     private var timer: Timer?
     private var provider: AnySpacesProvider?
     private var cancellables: Set<AnyCancellable> = []
+    private var spacesById: [String: AnySpace] = [:]
 
     init() {
         let runningApps = NSWorkspace.shared.runningApplications.compactMap {
@@ -63,8 +64,8 @@ class SpacesViewModel: ObservableObject {
         guard let provider = provider else { return }
         provider.spacesPublisher?
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] spaces in
-                self?.spaces = spaces
+            .sink { [weak self] event in
+                self?.handleSpaceEvent(event)
             }
             .store(in: &cancellables)
         provider.startObserving()
@@ -73,6 +74,36 @@ class SpacesViewModel: ObservableObject {
     private func stopMonitoringEventBasedProvider() {
         provider?.stopObserving()
         cancellables.removeAll()
+    }
+    
+    private func handleSpaceEvent(_ event: SpaceEvent) {
+        switch event {
+        case .initialState(let spaces):
+            spacesById = Dictionary(uniqueKeysWithValues: spaces.map { ($0.id, $0) })
+            updatePublishedSpaces()
+        case .focusChanged(let spaceId):
+            for (id, space) in spacesById {
+                let newFocused = id == spaceId
+                if space.isFocused != newFocused {
+                    spacesById[id] = AnySpace(
+                        id: space.id, isFocused: newFocused, windows: space.windows)
+                }
+            }
+            updatePublishedSpaces()
+        case .windowsUpdated(let spaceId, let windows):
+            if let space = spacesById[spaceId] {
+                spacesById[spaceId] = AnySpace(
+                    id: space.id, isFocused: space.isFocused, windows: windows)
+            }
+            updatePublishedSpaces()
+        }
+    }
+    
+    private func updatePublishedSpaces() {
+        let sortedSpaces = spacesById.values.sorted { $0.id < $1.id }
+        if sortedSpaces != spaces {
+            spaces = sortedSpaces
+        }
     }
 
     private func loadSpaces() {

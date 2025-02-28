@@ -20,8 +20,14 @@ protocol SpacesProvider {
     func getSpacesWithWindows() -> [SpaceType]?
 }
 
+enum SpaceEvent {
+    case initialState([AnySpace])
+    case focusChanged(String)
+    case windowsUpdated(String, [AnyWindow])
+}
+
 protocol EventBasedSpacesProvider {
-    var spacesPublisher: AnyPublisher<[AnySpace], Never> { get }
+    var spacesPublisher: AnyPublisher<SpaceEvent, Never> { get }
     
     func startObserving()
     func stopObserving()
@@ -69,6 +75,12 @@ struct AnySpace: Identifiable, Equatable {
         self.isFocused = space.isFocused
         self.windows = space.windows.map { AnyWindow($0) }
     }
+    
+    init(id: String, isFocused: Bool, windows: [AnyWindow]) {
+        self.id = id
+        self.isFocused = isFocused
+        self.windows = windows
+    }
 
     static func == (lhs: AnySpace, rhs: AnySpace) -> Bool {
         return lhs.id == rhs.id && lhs.isFocused == rhs.isFocused
@@ -84,10 +96,10 @@ class AnySpacesProvider {
     private let _isEventBased: Bool
     private let _startObserving: (() -> Void)?
     private let _stopObserving: (() -> Void)?
-    private let _spacesPublisher: AnyPublisher<[AnySpace], Never>?
+    private let _spacesPublisher: AnyPublisher<SpaceEvent, Never>?
     
     var isEventBased: Bool { _isEventBased }
-    var spacesPublisher: AnyPublisher<[AnySpace], Never>? { _spacesPublisher }
+    var spacesPublisher: AnyPublisher<SpaceEvent, Never>? { _spacesPublisher }
 
     init<P: SpacesProvider>(_ provider: P) {
         _getSpacesWithWindows = {
