@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 
 protocol SpaceModel: Identifiable, Equatable, Codable {
     associatedtype WindowType: WindowModel
@@ -17,6 +18,13 @@ protocol WindowModel: Identifiable, Equatable, Codable {
 protocol SpacesProvider {
     associatedtype SpaceType: SpaceModel
     func getSpacesWithWindows() -> [SpaceType]?
+}
+
+protocol EventBasedSpacesProvider {
+    var spacesPublisher: AnyPublisher<[AnySpace], Never> { get }
+    
+    func startObserving()
+    func stopObserving()
 }
 
 protocol SwitchableSpacesProvider: SpacesProvider {
@@ -72,11 +80,20 @@ class AnySpacesProvider {
     private let _getSpacesWithWindows: () -> [AnySpace]?
     private let _focusSpace: ((String, Bool) -> Void)?
     private let _focusWindow: ((String) -> Void)?
+    
+    private let _isEventBased: Bool
+    private let _startObserving: (() -> Void)?
+    private let _stopObserving: (() -> Void)?
+    private let _spacesPublisher: AnyPublisher<[AnySpace], Never>?
+    
+    var isEventBased: Bool { _isEventBased }
+    var spacesPublisher: AnyPublisher<[AnySpace], Never>? { _spacesPublisher }
 
     init<P: SpacesProvider>(_ provider: P) {
         _getSpacesWithWindows = {
             provider.getSpacesWithWindows()?.map { AnySpace($0) }
         }
+        
         if let switchable = provider as? any SwitchableSpacesProvider {
             _focusSpace = { spaceId, needWindowFocus in
                 switchable.focusSpace(
@@ -88,6 +105,18 @@ class AnySpacesProvider {
         } else {
             _focusSpace = nil
             _focusWindow = nil
+        }
+        
+        if let eventBased = provider as? any EventBasedSpacesProvider {
+            _isEventBased = true
+            _startObserving = eventBased.startObserving
+            _stopObserving = eventBased.stopObserving
+            _spacesPublisher = eventBased.spacesPublisher
+        } else {
+            _isEventBased = false
+            _startObserving = nil
+            _stopObserving = nil
+            _spacesPublisher = nil
         }
     }
 
@@ -101,5 +130,13 @@ class AnySpacesProvider {
 
     func focusWindow(windowId: String) {
         _focusWindow?(windowId)
+    }
+    
+    func startObserving() {
+        _startObserving?()
+    }
+    
+    func stopObserving() {
+        _stopObserving?()
     }
 }
